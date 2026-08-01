@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Adivina la Canción 🎵</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            padding: 15px;
+            margin: 0;
+        }
+        h1 {
+            color: #1DB954;
+            font-size: 1.8rem;
+            margin: 10px 0 15px 0;
+            text-align: center;
+        }
+        h2 {
+            color: #1DB954;
+            font-size: 1.3rem;
+            margin-top: 0;
+        }
+        .card {
+            background: #181818;
+            border-radius: 16px;
+            padding: 20px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            margin-bottom: 15px;
+            text-align: center;
+            border: 1px solid #282828;
+        }
+        input {
+            padding: 14px;
+            margin: 8px 0;
+            border-radius: 10px;
+            border: 1px solid #333;
+            background: #282828;
+            color: white;
+            width: 100%;
+            font-size: 1rem;
+            outline: none;
+        }
+        input:focus {
+            border-color: #1DB954;
+        }
+        button {
+            padding: 14px;
+            margin: 8px 0;
+            border-radius: 10px;
+            border: none;
+            width: 100%;
+            background-color: #1DB954;
+            color: white;
+            font-weight: bold;
+            font-size: 1.05rem;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+        button:active {
+            transform: scale(0.98);
+        }
+        .btn-secondary {
+            background-color: #333333;
+            color: #e0e0e0;
+        }
+        .btn-danger {
+            background-color: #d32f2f;
+            font-size: 0.85rem;
+            padding: 10px;
+            margin-top: 15px;
+        }
+        .scoreboard {
+            display: flex;
+            justify-content: space-around;
+            background: #282828;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+        .player-score {
+            flex: 1;
+        }
+        .player-name {
+            font-size: 1.1rem;
+            color: #b3b3b3;
+            font-weight: 600;
+            word-break: break-word;
+        }
+        .score-num {
+            font-size: 2.8rem;
+            color: #1DB954;
+            font-weight: bold;
+            line-height: 1.1;
+        }
+        .timer-container {
+            background: #222;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .timer {
+            font-size: 3.5rem;
+            margin: 5px 0;
+            color: #ffca28;
+            font-weight: bold;
+            font-family: monospace;
+        }
+        .points-section {
+            background: #222;
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 15px;
+        }
+        .player-btn-group {
+            margin-bottom: 10px;
+        }
+        .player-btn-group h4 {
+            margin: 8px 0 4px 0;
+            color: #ddd;
+            font-weight: normal;
+        }
+        .playlist-info {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 15px;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🎵 Adivina la Canción</h1>
+
+    <!-- FORMULARIO DE CONFIGURACIÓN -->
+    <div class="card" id="setup-card">
+        <h2>Configurar Juego</h2>
+        <input type="text" id="p1-name" placeholder="Nombre Jugador 1" value="Jugador 1">
+        <input type="text" id="p2-name" placeholder="Nombre Jugador 2" value="Jugador 2">
+        <input type="url" id="playlist-url" placeholder="Link de Playlist (Spotify / YouTube)">
+        <button onclick="saveSetup()">Guardar e Iniciar Juego</button>
+    </div>
+
+    <!-- PANTALLA PRINCIPAL DEL JUEGO -->
+    <div class="card" id="game-card" style="display:none;">
+        <div class="scoreboard">
+            <div class="player-score">
+                <div class="player-name" id="label-p1">Jugador 1</div>
+                <div class="score-num" id="score-p1">0</div>
+            </div>
+            <div style="border-left: 1px solid #444; margin: 0 10px;"></div>
+            <div class="player-score">
+                <div class="player-name" id="label-p2">Jugador 2</div>
+                <div class="score-num" id="score-p2">0</div>
+            </div>
+        </div>
+
+        <div class="timer-container">
+            <div class="timer" id="timer-display">0.0s</div>
+            <button id="btn-timer" onclick="toggleTimer()">▶️ Empezar Tiempo</button>
+            <button class="btn-secondary" onclick="resetTimer()">🔄 Reiniciar Tiempo</button>
+        </div>
+
+        <div class="points-section">
+            <h3 style="margin-top:0; color:#1DB954; font-size:1.1rem;">Sumar Puntos</h3>
+            
+            <div class="player-btn-group">
+                <h4>Puntos para <b id="btn-p1-label" style="color:#fff;">P1</b>:</h4>
+                <button class="btn-secondary" onclick="addPoints(1)">+ Puntos (según tiempo)</button>
+            </div>
+            
+            <div class="player-btn-group">
+                <h4>Puntos para <b id="btn-p2-label" style="color:#fff;">P2</b>:</h4>
+                <button class="btn-secondary" onclick="addPoints(2)">+ Puntos (según tiempo)</button>
+            </div>
+        </div>
+
+        <div class="playlist-info" id="playlist-saved-info"></div>
+        <button class="btn-danger" onclick="resetSetup()">⚙️ Cambiar Nombres o Playlist</button>
+    </div>
+
+    <script>
+        let p1Name = "Jugador 1", p2Name = "Jugador 2";
+        let score1 = 0, score2 = 0;
+        let timerInterval = null;
+        let startTime = 0;
+        let elapsedTime = 0;
+        let isRunning = false;
+
+        // Cargar datos guardados si existen al iniciar
+        window.onload = function() {
+            const savedPlaylist = localStorage.getItem('game_playlist');
+            const savedP1 = localStorage.getItem('game_p1');
+            const savedP2 = localStorage.getItem('game_p2');
+
+            if (savedPlaylist) {
+                document.getElementById('playlist-url').value = savedPlaylist;
+                if (savedP1) document.getElementById('p1-name').value = savedP1;
+                if (savedP2) document.getElementById('p2-name').value = savedP2;
+                startGame();
+            }
+        };
+
+        function saveSetup() {
+            const playlist = document.getElementById('playlist-url').value.trim();
+            p1Name = document.getElementById('p1-name').value.trim() || "Jugador 1";
+            p2Name = document.getElementById('p2-name').value.trim() || "Jugador 2";
+
+            if (!playlist) {
+                alert("Por favor ingresa un link de playlist");
+                return;
+            }
+
+            localStorage.setItem('game_playlist', playlist);
+            localStorage.setItem('game_p1', p1Name);
+            localStorage.setItem('game_p2', p2Name);
+
+            startGame();
+        }
+
+        function startGame() {
+            p1Name = localStorage.getItem('game_p1') || "Jugador 1";
+            p2Name = localStorage.getItem('game_p2') || "Jugador 2";
+            const playlist = localStorage.getItem('game_playlist');
+
+            document.getElementById('label-p1').innerText = p1Name;
+            document.getElementById('label-p2').innerText = p2Name;
+            document.getElementById('btn-p1-label').innerText = p1Name;
+            document.getElementById('btn-p2-label').innerText = p2Name;
+            document.getElementById('playlist-saved-info').innerHTML = `<b>Playlist guardada:</b> <a href="${playlist}" target="_blank" style="color:#1DB954;">Abrir Playlist</a>`;
+
+            document.getElementById('setup-card').style.display = 'none';
+            document.getElementById('game-card').style.display = 'block';
+        }
+
+        function toggleTimer() {
+            if (isRunning) {
+                clearInterval(timerInterval);
+                document.getElementById('btn-timer').innerText = "▶️ Continuar";
+                document.getElementById('btn-timer').style.backgroundColor = "#1DB954";
+                isRunning = false;
+            } else {
+                startTime = Date.now() - elapsedTime;
+                timerInterval = setInterval(updateTimer, 100);
+                document.getElementById('btn-timer').innerText = "⏸️ Pausar";
+                document.getElementById('btn-timer').style.backgroundColor = "#ff9800";
+                isRunning = true;
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            elapsedTime = 0;
+            document.getElementById('timer-display').innerText = "0.0s";
+            document.getElementById('btn-timer').innerText = "▶️ Empezar Tiempo";
+            document.getElementById('btn-timer').style.backgroundColor = "#1DB954";
+        }
+
+        function updateTimer() {
+            elapsedTime = Date.now() - startTime;
+            let seconds = (elapsedTime / 1000).toFixed(1);
+            document.getElementById('timer-display').innerText = seconds + "s";
+        }
+
+        function calculatePoints(seconds) {
+            if (seconds <= 2) return 5;
+            if (seconds <= 5) return 3;
+            if (seconds <= 10) return 1;
+            return 1; // Más de 10 segundos
+        }
+
+        function addPoints(player) {
+            let seconds = elapsedTime / 1000;
+            if (seconds === 0) {
+                alert("Primero inicia el cronómetro para calcular el tiempo.");
+                return;
+            }
+
+            let pts = calculatePoints(seconds);
+
+            if (player === 1) {
+                score1 += pts;
+                document.getElementById('score-p1').innerText = score1;
+            } else {
+                score2 += pts;
+                document.getElementById('score-p2').innerText = score2;
+            }
+
+            alert(`¡+${pts} punto(s) para ${player === 1 ? p1Name : p2Name}!`);
+            resetTimer();
+        }
+
+        function resetSetup() {
+            if (confirm("¿Querés cambiar la playlist o reiniciar el juego?")) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
