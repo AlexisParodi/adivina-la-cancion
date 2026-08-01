@@ -309,11 +309,13 @@
             });
 
             spotifyPlayer.addListener('authentication_error', ({ message }) => {
-                alert("Sesión expirada. Presiona 'Reconectar Spotify'.");
+                document.getElementById('feedback-msg').innerText = "❌ Sesión expirada. Presiona 'Reconectar Spotify'.";
+                document.getElementById('feedback-msg').style.color = "#d32f2f";
             });
 
             spotifyPlayer.addListener('account_error', ({ message }) => {
-                alert("⚠️ Se requiere una cuenta de Spotify PREMIUM activa para reproducir audio web.");
+                document.getElementById('feedback-msg').innerText = "⚠️ Se requiere una cuenta de Spotify PREMIUM activa.";
+                document.getElementById('feedback-msg').style.color = "#d32f2f";
             });
 
             spotifyPlayer.connect();
@@ -322,6 +324,7 @@
         function manualInitPlayer() {
             initSpotifyPlayer();
             document.getElementById('feedback-msg').innerText = "⏳ Conectando reproductor...";
+            document.getElementById('feedback-msg').style.color = "#ffca28";
         }
 
         function extractPlaylistId(urlOrId) {
@@ -386,22 +389,23 @@
             document.getElementById('setup-card').style.display = 'none';
             document.getElementById('game-card').style.display = 'block';
 
-            // Intentar inicializar el reproductor con el clic del usuario
+            // Conectar el reproductor silenciosamente en segundo plano sin interrumpir al usuario
             if (!deviceId) {
                 initSpotifyPlayer();
+                document.getElementById('feedback-msg').innerText = "Conectando con el reproductor de Spotify... Aguarda unos segundos.";
+                document.getElementById('feedback-msg').style.color = "#ffca28";
+                
                 setTimeout(() => {
                     if (!deviceId) {
                         document.getElementById('btn-init-player').style.display = 'block';
-                        document.getElementById('feedback-msg').innerText = "Presiona '⚡ Activar Reproductor Web' para conectar Spotify.";
-                        document.getElementById('feedback-msg').style.color = "#ffca28";
+                        document.getElementById('feedback-msg').innerText = "Presiona '⚡ Activar Reproductor Web' arriba para vincular Spotify.";
                     }
-                }, 2000);
+                }, 3000);
             }
         }
 
         async function playRandomSong() {
             if (!deviceId) {
-                // Si el SDK web no conectó, intentamos obtener los dispositivos activos de Spotify
                 try {
                     const devRes = await fetch('https://api.spotify.com/v1/me/player/devices', {
                         headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -414,7 +418,8 @@
 
                 if (!deviceId) {
                     document.getElementById('btn-init-player').style.display = 'block';
-                    alert("Presiona el botón amarillo '⚡ Activar Reproductor Web' arriba o abre Spotify en tu PC/Celular para continuar.");
+                    document.getElementById('feedback-msg').innerText = "Presiona '⚡ Activar Reproductor Web' para conectar la reproducción.";
+                    document.getElementById('feedback-msg').style.color = "#ffca28";
                     return;
                 }
             }
