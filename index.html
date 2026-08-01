@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Adivina la Canción 🎵</title>
+    <title>Adivina la Canción 🎵 (Spotify Edition)</title>
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body {
@@ -54,6 +54,7 @@
             cursor: pointer;
         }
         button:active { transform: scale(0.98); }
+        .btn-spotify { background-color: #1DB954; color: #000; font-size: 1.1rem; }
         .btn-secondary { background-color: #333; color: #eee; }
         .btn-pause { background-color: #ff9800; color: #000; }
         .btn-danger { background-color: #d32f2f; font-size: 0.85rem; padding: 10px; margin-top: 15px; }
@@ -67,16 +68,6 @@
         }
         .score-num { font-size: 2.5rem; color: #1DB954; font-weight: bold; }
         .timer { font-size: 3rem; margin: 5px 0; color: #ffca28; font-weight: bold; font-family: monospace; }
-        
-        #player-wrapper {
-            margin: 10px auto;
-            border-radius: 8px;
-            overflow: hidden;
-            width: 200px;
-            height: 120px;
-            background: #000;
-        }
-        
         .song-info {
             background: #222;
             padding: 12px;
@@ -106,16 +97,23 @@
 
     <h1>🎵 Adivina la Canción</h1>
 
-    <!-- CONFIGURACIÓN -->
-    <div class="card" id="setup-card">
+    <!-- PANTALLA 1: LOGIN CON SPOTIFY -->
+    <div class="card" id="login-card">
+        <h2>Conectar con Spotify</h2>
+        <p style="font-size: 0.9rem; color: #aaa;">Inicia sesión con tu cuenta de Spotify Premium para reproducir tus playlists directamente en el juego.</p>
+        <button class="btn-spotify" onclick="loginSpotify()">🟢 Iniciar Sesión con Spotify</button>
+    </div>
+
+    <!-- PANTALLA 2: CONFIGURACIÓN -->
+    <div class="card" id="setup-card" style="display:none;">
         <h2>Configuración</h2>
         <input type="text" id="p1-name" placeholder="Nombre Jugador 1" value="Jugador 1">
         <input type="text" id="p2-name" placeholder="Nombre Jugador 2" value="Jugador 2">
-        <input type="text" id="playlist-id" placeholder="Link o ID de Playlist de YouTube">
+        <input type="text" id="playlist-id" placeholder="Link o ID de Playlist de Spotify">
         <button onclick="saveSetup()">Guardar e Iniciar Juego</button>
     </div>
 
-    <!-- JUEGO PRINCIPAL -->
+    <!-- PANTALLA 3: JUEGO PRINCIPAL -->
     <div class="card" id="game-card" style="display:none;">
         <div class="scoreboard">
             <div>
@@ -132,11 +130,7 @@
         <div class="timer" id="timer-display">0.0s</div>
         <div class="badge-pts" id="current-pts-badge">Valor: 5 Puntos</div>
 
-        <div id="player-wrapper">
-            <div id="yt-player"></div>
-        </div>
-
-        <!-- BOTONES DE CONTROL DE REPRODUCCIÓN Y PAUSA -->
+        <!-- CONTROLES -->
         <button id="btn-main-action" onclick="playRandomSong()" style="background-color: #1DB954; font-size: 1.1rem;">▶️ Siguiente Canción Aleatoria</button>
         <button id="btn-pause-manual" class="btn-pause" onclick="pauseManually()" style="display:none;">⏸️ Pausar Canción y Tiempo</button>
 
@@ -155,77 +149,132 @@
             </div>
         </div>
 
-        <button class="btn-danger" onclick="resetSetup()">⚙️ Cambiar Playlist o Nombres</button>
+        <button class="btn-danger" onclick="logoutSpotify()">⚙️ Cerrar Sesión / Cambiar Playlist</button>
     </div>
 
+    <!-- SDK Web Playback de Spotify -->
+    <script src="https://sdk.scdn.co/spotify-player.js"></script>
     <script>
+        // ⚠️ PEGA AQUÍ TU CLIENT ID COPIADO DE SPOTIFY DEVELOPERS
+        const CLIENT_ID = '03c5fd3099224cb9bfeea3acf10d5a55'; 
+        const REDIRECT_URI = window.location.origin + window.location.pathname;
+
+        let accessToken = null;
+        let spotifyPlayer = null;
+        let deviceId = null;
+
         let p1Name = "Jugador 1", p2Name = "Jugador 2";
         let score1 = 0, score2 = 0;
-        let playlistId = "";
-        let player = null;
+        let playlistTracks = [];
+        let currentTrack = null;
+
         let timerInterval = null;
         let startTime = 0;
         let elapsedTime = 0;
-        let isRunning = false;
-        let currentSongTitle = "";
         let pendingPoints = 0;
-        let isPlayerReady = false;
 
-        // Tramos de pausas automáticas (en segundos)
         const checkPoints = [2.0, 5.0, 10.0];
         let nextCheckIndex = 0;
 
-        var tag = document.createElement('script');
-        tag.src = "https://www.youtube.com/iframe_api";
-        var firstScriptTag = document.getElementsByTagName('script')[0];
-        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-
-        function onYouTubeIframeAPIReady() {}
-
+        // Capturar Token desde la URL post-login
         window.onload = function() {
-            const savedPlaylist = localStorage.getItem('yt_playlist_id');
-            const savedP1 = localStorage.getItem('game_p1');
-            const savedP2 = localStorage.getItem('game_p2');
+            const hash = window.location.hash.substring(1);
+            const params = new URLSearchParams(hash);
+            if (params.has('access_token')) {
+                accessToken = params.get('access_token');
+                window.location.hash = '';
+                localStorage.setItem('spotify_token', accessToken);
+            } else {
+                accessToken = localStorage.getItem('spotify_token');
+            }
 
-            if (savedPlaylist) {
-                document.getElementById('playlist-id').value = savedPlaylist;
+            if (accessToken) {
+                document.getElementById('login-card').style.display = 'none';
+                document.getElementById('setup-card').style.display = 'block';
+                const savedP1 = localStorage.getItem('game_p1');
+                const savedP2 = localStorage.getItem('game_p2');
+                const savedPlaylist = localStorage.getItem('spotify_playlist_id');
                 if (savedP1) document.getElementById('p1-name').value = savedP1;
                 if (savedP2) document.getElementById('p2-name').value = savedP2;
-                startGame();
+                if (savedPlaylist) document.getElementById('playlist-id').value = savedPlaylist;
             }
         };
 
+        function loginSpotify() {
+            const scopes = [
+                'streaming',
+                'user-read-email',
+                'user-read-private',
+                'user-modify-playback-state',
+                'playlist-read-private'
+            ];
+            const authUrl = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=token&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(scopes.join(' '))}`;
+            window.location.href = authUrl;
+        }
+
+        function logoutSpotify() {
+            localStorage.clear();
+            location.reload();
+        }
+
+        // Inicializar SDK de Spotify
+        window.onSpotifyWebPlaybackSDKReady = () => {
+            if (!accessToken) return;
+            spotifyPlayer = new Spotify.Player({
+                name: 'Adivina la Canción Web',
+                getOAuthToken: cb => { cb(accessToken); },
+                volume: 0.8
+            });
+
+            spotifyPlayer.addListener('ready', ({ device_id }) => {
+                deviceId = device_id;
+            });
+
+            spotifyPlayer.connect();
+        };
+
         function extractPlaylistId(urlOrId) {
-            if (urlOrId.includes("list=")) {
-                return urlOrId.split("list=")[1].split("&")[0];
+            if (urlOrId.includes("playlist/")) {
+                return urlOrId.split("playlist/")[1].split("?")[0];
             }
             return urlOrId.trim();
         }
 
-        function saveSetup() {
+        async function saveSetup() {
             const inputVal = document.getElementById('playlist-id').value.trim();
             p1Name = document.getElementById('p1-name').value.trim() || "Jugador 1";
             p2Name = document.getElementById('p2-name').value.trim() || "Jugador 2";
 
             if (!inputVal) {
-                alert("Ingresa un link o ID de playlist de YouTube");
+                alert("Ingresa un link o ID de playlist de Spotify");
                 return;
             }
 
-            playlistId = extractPlaylistId(inputVal);
-
-            localStorage.setItem('yt_playlist_id', playlistId);
+            const playlistId = extractPlaylistId(inputVal);
+            localStorage.setItem('spotify_playlist_id', playlistId);
             localStorage.setItem('game_p1', p1Name);
             localStorage.setItem('game_p2', p2Name);
 
-            startGame();
+            // Cargar canciones de la playlist vía API
+            try {
+                const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                const data = await res.json();
+                playlistTracks = data.items.map(item => item.track).filter(track => track && track.uri);
+                
+                if (playlistTracks.length === 0) {
+                    alert("No se pudieron cargar las canciones de la playlist. Asegúrate de que la playlist sea pública.");
+                    return;
+                }
+
+                startGame();
+            } catch (e) {
+                alert("Error al conectar con la playlist. Revisa los permisos o vuelve a iniciar sesión.");
+            }
         }
 
         function startGame() {
-            p1Name = localStorage.getItem('game_p1') || "Jugador 1";
-            p2Name = localStorage.getItem('game_p2') || "Jugador 2";
-            playlistId = localStorage.getItem('yt_playlist_id');
-
             document.getElementById('label-p1').innerText = p1Name;
             document.getElementById('label-p2').innerText = p2Name;
             document.getElementById('btn-award-p1').innerText = "+ Puntos a " + p1Name;
@@ -233,83 +282,63 @@
 
             document.getElementById('setup-card').style.display = 'none';
             document.getElementById('game-card').style.display = 'block';
-
-            player = new YT.Player('yt-player', {
-                height: '120',
-                width: '200',
-                playerVars: {
-                    'listType': 'playlist',
-                    'list': playlistId,
-                    'autoplay': 0,
-                    'controls': 1,
-                    'playsinline': 1
-                },
-                events: {
-                    'onReady': () => { isPlayerReady = true; },
-                    'onStateChange': onPlayerStateChange
-                }
-            });
         }
 
-        function updatePtsBadge(seconds) {
-            let pts = calculatePoints(seconds);
-            document.getElementById('current-pts-badge').innerText = `Valor actual: ${pts} Punto(s)`;
-        }
-
-        function playRandomSong() {
-            if (!player || !isPlayerReady) {
-                alert("El reproductor aún está cargando. Aguarda un segundo.");
+        async function playRandomSong() {
+            if (!deviceId) {
+                alert("Conectando con el reproductor de Spotify... Aguarda unos segundos.");
                 return;
             }
 
             document.getElementById('assign-points-section').style.display = 'none';
             document.getElementById('guess-input').value = '';
-            document.getElementById('feedback-msg').innerText = "🔊 Reproduciendo canción...";
+            document.getElementById('feedback-msg').innerText = "🔊 Sonando desde Spotify...";
             document.getElementById('feedback-msg').style.color = "#1DB954";
 
             nextCheckIndex = 0;
             updatePtsBadge(0);
 
-            try {
-                const playlist = player.getPlaylist();
-                if (playlist && playlist.length > 0) {
-                    const randomIndex = Math.floor(Math.random() * playlist.length);
-                    player.playVideoAt(randomIndex);
-                } else {
-                    player.playVideo();
+            // Seleccionar tema al azar
+            const randomIndex = Math.floor(Math.random() * playlistTracks.length);
+            currentTrack = playlistTracks[randomIndex];
+
+            // Reproducir a través del dispositivo Web SDK de Spotify
+            await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ uris: [currentTrack.uri] }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`
                 }
-                
-                resetAndStartTimer();
-                showPauseButton(true);
-            } catch (e) {
-                console.error(e);
-            }
+            });
+
+            resetAndStartTimer();
+            showPauseButton(true);
         }
 
-        function resumeSong() {
-            if (player && player.playVideo) {
-                player.playVideo();
+        async function resumeSong() {
+            if (spotifyPlayer) {
+                await spotifyPlayer.resume();
                 startTimerFromCurrent();
                 showPauseButton(true);
-                document.getElementById('feedback-msg').innerText = "🔊 Continuación de canción...";
+                document.getElementById('feedback-msg').innerText = "🔊 Reanudando canción...";
                 document.getElementById('feedback-msg').style.color = "#1DB954";
             }
         }
 
-        function pauseManually() {
-            pausePlayback();
-            document.getElementById('feedback-msg').innerText = "⏸️ Pausado manualmente. ¡Ingresa tu respuesta!";
+        async function pauseManually() {
+            await pausePlayback();
+            document.getElementById('feedback-msg').innerText = "⏸️ Pausado. ¡Escribe tu respuesta!";
             document.getElementById('feedback-msg').style.color = "#ffca28";
             
-            // Configura el botón principal para poder continuar si nadie adivina
             const btnMain = document.getElementById('btn-main-action');
             btnMain.innerText = "▶️ Continuar Canción";
             btnMain.onclick = resumeSong;
             btnMain.style.backgroundColor = "#ff9800";
         }
 
-        function pausePlayback() {
-            if (player && player.pauseVideo) player.pauseVideo();
+        async function pausePlayback() {
+            if (spotifyPlayer) await spotifyPlayer.pause();
             stopTimer();
             showPauseButton(false);
         }
@@ -330,14 +359,12 @@
             clearInterval(timerInterval);
             elapsedTime = 0;
             startTime = Date.now();
-            isRunning = true;
             runTimerLoop();
         }
 
         function startTimerFromCurrent() {
             clearInterval(timerInterval);
             startTime = Date.now() - elapsedTime;
-            isRunning = true;
             runTimerLoop();
         }
 
@@ -348,7 +375,6 @@
                 document.getElementById('timer-display').innerText = seconds.toFixed(1) + "s";
                 updatePtsBadge(seconds);
 
-                // Comprobar freno automático por tramos
                 if (nextCheckIndex < checkPoints.length) {
                     let targetPoint = checkPoints[nextCheckIndex];
                     if (seconds >= targetPoint) {
@@ -358,7 +384,6 @@
                         document.getElementById('feedback-msg').innerHTML = `⏸️ <b>Pausa a los ${targetPoint}s</b><br>¿Alguien sabe la canción?`;
                         document.getElementById('feedback-msg').style.color = "#ffca28";
 
-                        // Cambiar botón principal a 'Continuar'
                         const btnMain = document.getElementById('btn-main-action');
                         btnMain.innerText = "▶️ Continuar (Siguiente tramo)";
                         btnMain.onclick = resumeSong;
@@ -370,16 +395,11 @@
 
         function stopTimer() {
             clearInterval(timerInterval);
-            isRunning = false;
         }
 
-        function onPlayerStateChange(event) {
-            if (event.data === YT.PlayerState.PLAYING) {
-                const videoData = player.getVideoData();
-                if (videoData && videoData.title) {
-                    currentSongTitle = videoData.title;
-                }
-            }
+        function updatePtsBadge(seconds) {
+            let pts = calculatePoints(seconds);
+            document.getElementById('current-pts-badge').innerText = `Valor actual: ${pts} Punto(s)`;
         }
 
         function calculatePoints(seconds) {
@@ -397,14 +417,10 @@
 
         function checkAnswer() {
             const userGuess = document.getElementById('guess-input').value.trim();
-            if (!userGuess) return;
-
-            if (!currentSongTitle && player && player.getVideoData) {
-                currentSongTitle = player.getVideoData().title || "";
-            }
+            if (!userGuess || !currentTrack) return;
 
             const cleanGuess = normalizeText(userGuess);
-            const cleanTitle = normalizeText(currentSongTitle);
+            const cleanTitle = normalizeText(currentTrack.name);
 
             if (cleanTitle.includes(cleanGuess) && cleanGuess.length >= 3) {
                 pausePlayback();
@@ -412,12 +428,11 @@
                 let seconds = elapsedTime / 1000;
                 pendingPoints = calculatePoints(seconds);
 
-                document.getElementById('feedback-msg').innerHTML = `🎉 ¡CORRECTO! (${seconds.toFixed(1)}s)<br><small>${currentSongTitle}</small>`;
+                document.getElementById('feedback-msg').innerHTML = `🎉 ¡CORRECTO! (${seconds.toFixed(1)}s)<br><small>${currentTrack.name} - ${currentTrack.artists[0].name}</small>`;
                 document.getElementById('feedback-msg').style.color = "#1DB954";
 
                 document.getElementById('assign-points-section').style.display = 'block';
 
-                // Restablecer botón para la siguiente ronda
                 const btnMain = document.getElementById('btn-main-action');
                 btnMain.innerText = "▶️ Siguiente Canción Aleatoria";
                 btnMain.onclick = playRandomSong;
@@ -439,13 +454,6 @@
 
             document.getElementById('assign-points-section').style.display = 'none';
             document.getElementById('feedback-msg').innerText = `+${pendingPoints} pts agregados a ${playerNum === 1 ? p1Name : p2Name}. Toca "Siguiente Canción"`;
-        }
-
-        function resetSetup() {
-            if (confirm("¿Quieres cambiar la playlist o reiniciar los puntos?")) {
-                localStorage.clear();
-                location.reload();
-            }
         }
     </script>
 </body>
