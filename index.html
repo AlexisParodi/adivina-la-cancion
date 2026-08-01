@@ -5,39 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Adivina la Canción 🎵</title>
     <style>
-        * {
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: #121212;
             color: #ffffff;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: flex-start;
             min-height: 100vh;
             padding: 15px;
             margin: 0;
         }
-        h1 {
-            color: #1DB954;
-            font-size: 1.8rem;
-            margin: 10px 0 15px 0;
-            text-align: center;
-        }
-        h2 {
-            color: #1DB954;
-            font-size: 1.3rem;
-            margin-top: 0;
-        }
+        h1 { color: #1DB954; font-size: 1.8rem; margin: 10px 0; text-align: center; }
         .card {
             background: #181818;
             border-radius: 16px;
             padding: 20px;
             width: 100%;
-            max-width: 420px;
+            max-width: 450px;
             box-shadow: 0 8px 24px rgba(0,0,0,0.6);
             margin-bottom: 15px;
             text-align: center;
@@ -54,9 +40,7 @@
             font-size: 1rem;
             outline: none;
         }
-        input:focus {
-            border-color: #1DB954;
-        }
+        input:focus { border-color: #1DB954; }
         button {
             padding: 14px;
             margin: 8px 0;
@@ -68,21 +52,10 @@
             font-weight: bold;
             font-size: 1.05rem;
             cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
         }
-        button:active {
-            transform: scale(0.98);
-        }
-        .btn-secondary {
-            background-color: #333333;
-            color: #e0e0e0;
-        }
-        .btn-danger {
-            background-color: #d32f2f;
-            font-size: 0.85rem;
-            padding: 10px;
-            margin-top: 15px;
-        }
+        button:active { transform: scale(0.98); }
+        .btn-secondary { background-color: #333; color: #eee; }
+        .btn-danger { background-color: #d32f2f; font-size: 0.85rem; padding: 10px; margin-top: 15px; }
         .scoreboard {
             display: flex;
             justify-content: space-around;
@@ -91,53 +64,22 @@
             border-radius: 12px;
             margin-bottom: 15px;
         }
-        .player-score {
-            flex: 1;
-        }
-        .player-name {
-            font-size: 1.1rem;
-            color: #b3b3b3;
-            font-weight: 600;
-            word-break: break-word;
-        }
-        .score-num {
-            font-size: 2.8rem;
-            color: #1DB954;
-            font-weight: bold;
-            line-height: 1.1;
-        }
-        .timer-container {
+        .score-num { font-size: 2.5rem; color: #1DB954; font-weight: bold; }
+        .timer { font-size: 3rem; margin: 5px 0; color: #ffca28; font-weight: bold; font-family: monospace; }
+        #player-container { display: none; } /* Reproductor oculto */
+        .song-info {
             background: #222;
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-        .timer {
-            font-size: 3.5rem;
-            margin: 5px 0;
-            color: #ffca28;
-            font-weight: bold;
-            font-family: monospace;
-        }
-        .points-section {
-            background: #222;
-            border-radius: 12px;
             padding: 12px;
-            margin-top: 15px;
+            border-radius: 10px;
+            margin-top: 10px;
+            font-weight: bold;
+            color: #1DB954;
+            min-height: 45px;
         }
-        .player-btn-group {
-            margin-bottom: 10px;
-        }
-        .player-btn-group h4 {
-            margin: 8px 0 4px 0;
-            color: #ddd;
-            font-weight: normal;
-        }
-        .playlist-info {
-            font-size: 0.8rem;
-            color: #888;
-            margin-top: 15px;
-            word-break: break-all;
+        .player-select {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
         }
     </style>
 </head>
@@ -145,86 +87,111 @@
 
     <h1>🎵 Adivina la Canción</h1>
 
-    <!-- FORMULARIO DE CONFIGURACIÓN -->
+    <!-- CONFIGURACIÓN -->
     <div class="card" id="setup-card">
-        <h2>Configurar Juego</h2>
+        <h2>Configuración</h2>
         <input type="text" id="p1-name" placeholder="Nombre Jugador 1" value="Jugador 1">
         <input type="text" id="p2-name" placeholder="Nombre Jugador 2" value="Jugador 2">
-        <input type="url" id="playlist-url" placeholder="Link de Playlist (Spotify / YouTube)">
+        <input type="text" id="playlist-id" placeholder="Link o ID de Playlist de YouTube">
         <button onclick="saveSetup()">Guardar e Iniciar Juego</button>
     </div>
 
-    <!-- PANTALLA PRINCIPAL DEL JUEGO -->
+    <!-- JUEGO PRINCIPAL -->
     <div class="card" id="game-card" style="display:none;">
         <div class="scoreboard">
-            <div class="player-score">
-                <div class="player-name" id="label-p1">Jugador 1</div>
+            <div>
+                <div id="label-p1" style="color:#aaa;">P1</div>
                 <div class="score-num" id="score-p1">0</div>
             </div>
-            <div style="border-left: 1px solid #444; margin: 0 10px;"></div>
-            <div class="player-score">
-                <div class="player-name" id="label-p2">Jugador 2</div>
+            <div style="border-left: 1px solid #444;"></div>
+            <div>
+                <div id="label-p2" style="color:#aaa;">P2</div>
                 <div class="score-num" id="score-p2">0</div>
             </div>
         </div>
 
-        <div class="timer-container">
-            <div class="timer" id="timer-display">0.0s</div>
-            <button id="btn-timer" onclick="toggleTimer()">▶️ Empezar Tiempo</button>
-            <button class="btn-secondary" onclick="resetTimer()">🔄 Reiniciar Tiempo</button>
+        <div class="timer" id="timer-display">0.0s</div>
+
+        <button onclick="playRandomSong()" style="background-color: #ff9800; font-size: 1.2rem;">▶️ Siguiente Canción Aleatoria</button>
+
+        <div style="margin-top: 15px;">
+            <input type="text" id="guess-input" placeholder="Escribe el nombre de la canción...">
+            <button class="btn-secondary" onclick="checkAnswer()">🔍 Comprobar Respuesta</button>
         </div>
 
-        <div class="points-section">
-            <h3 style="margin-top:0; color:#1DB954; font-size:1.1rem;">Sumar Puntos</h3>
-            
-            <div class="player-btn-group">
-                <h4>Puntos para <b id="btn-p1-label" style="color:#fff;">P1</b>:</h4>
-                <button class="btn-secondary" onclick="addPoints(1)">+ Puntos (según tiempo)</button>
-            </div>
-            
-            <div class="player-btn-group">
-                <h4>Puntos para <b id="btn-p2-label" style="color:#fff;">P2</b>:</h4>
-                <button class="btn-secondary" onclick="addPoints(2)">+ Puntos (según tiempo)</button>
+        <div class="song-info" id="feedback-msg">Presiona "Siguiente Canción" para comenzar</div>
+
+        <div id="assign-points-section" style="display:none; margin-top: 15px;">
+            <p style="margin: 5px 0; font-size: 0.9rem;">¿Quién la adivinó?</p>
+            <div class="player-select">
+                <button onclick="awardPoints(1)" id="btn-award-p1">Jugador 1</button>
+                <button onclick="awardPoints(2)" id="btn-award-p2">Jugador 2</button>
             </div>
         </div>
 
-        <div class="playlist-info" id="playlist-saved-info"></div>
-        <button class="btn-danger" onclick="resetSetup()">⚙️ Cambiar Nombres o Playlist</button>
+        <button class="btn-danger" onclick="resetSetup()">⚙️ Cambiar Playlist o Nombres</button>
+    </div>
+
+    <!-- Contenedor iframe de YouTube (Oculto) -->
+    <div id="player-container">
+        <div id="yt-player"></div>
     </div>
 
     <script>
         let p1Name = "Jugador 1", p2Name = "Jugador 2";
         let score1 = 0, score2 = 0;
+        let playlistId = "";
+        let player = null;
         let timerInterval = null;
         let startTime = 0;
         let elapsedTime = 0;
         let isRunning = false;
+        let currentSongTitle = "";
+        let pendingPoints = 0;
 
-        // Cargar datos guardados si existen al iniciar
+        // Cargar API de YouTube
+        var tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        var firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+        function onYouTubeIframeAPIReady() {
+            // API Lista
+        }
+
         window.onload = function() {
-            const savedPlaylist = localStorage.getItem('game_playlist');
+            const savedPlaylist = localStorage.getItem('yt_playlist_id');
             const savedP1 = localStorage.getItem('game_p1');
             const savedP2 = localStorage.getItem('game_p2');
 
             if (savedPlaylist) {
-                document.getElementById('playlist-url').value = savedPlaylist;
+                document.getElementById('playlist-id').value = savedPlaylist;
                 if (savedP1) document.getElementById('p1-name').value = savedP1;
                 if (savedP2) document.getElementById('p2-name').value = savedP2;
                 startGame();
             }
         };
 
+        function extractPlaylistId(urlOrId) {
+            if (urlOrId.includes("list=")) {
+                return urlOrId.split("list=")[1].split("&")[0];
+            }
+            return urlOrId.trim();
+        }
+
         function saveSetup() {
-            const playlist = document.getElementById('playlist-url').value.trim();
+            const inputVal = document.getElementById('playlist-id').value.trim();
             p1Name = document.getElementById('p1-name').value.trim() || "Jugador 1";
             p2Name = document.getElementById('p2-name').value.trim() || "Jugador 2";
 
-            if (!playlist) {
-                alert("Por favor ingresa un link de playlist");
+            if (!inputVal) {
+                alert("Ingresa un link o ID de playlist de YouTube");
                 return;
             }
 
-            localStorage.setItem('game_playlist', playlist);
+            playlistId = extractPlaylistId(inputVal);
+
+            localStorage.setItem('yt_playlist_id', playlistId);
             localStorage.setItem('game_p1', p1Name);
             localStorage.setItem('game_p2', p2Name);
 
@@ -234,78 +201,138 @@
         function startGame() {
             p1Name = localStorage.getItem('game_p1') || "Jugador 1";
             p2Name = localStorage.getItem('game_p2') || "Jugador 2";
-            const playlist = localStorage.getItem('game_playlist');
+            playlistId = localStorage.getItem('yt_playlist_id');
 
             document.getElementById('label-p1').innerText = p1Name;
             document.getElementById('label-p2').innerText = p2Name;
-            document.getElementById('btn-p1-label').innerText = p1Name;
-            document.getElementById('btn-p2-label').innerText = p2Name;
-            document.getElementById('playlist-saved-info').innerHTML = `<b>Playlist guardada:</b> <a href="${playlist}" target="_blank" style="color:#1DB954;">Abrir Playlist</a>`;
+            document.getElementById('btn-award-p1').innerText = "+ Puntos a " + p1Name;
+            document.getElementById('btn-award-p2').innerText = "+ Puntos a " + p2Name;
 
             document.getElementById('setup-card').style.display = 'none';
             document.getElementById('game-card').style.display = 'block';
+
+            // Inicializar reproductor
+            player = new YT.Player('yt-player', {
+                height: '200',
+                width: '200',
+                playerVars: {
+                    'listType': 'playlist',
+                    'list': playlistId,
+                    'autoplay': 0,
+                    'controls': 0
+                },
+                events: {
+                    'onStateChange': onPlayerStateChange
+                }
+            });
         }
 
-        function toggleTimer() {
-            if (isRunning) {
-                clearInterval(timerInterval);
-                document.getElementById('btn-timer').innerText = "▶️ Continuar";
-                document.getElementById('btn-timer').style.backgroundColor = "#1DB954";
-                isRunning = false;
+        function playRandomSong() {
+            if (!player || !player.getPlaylist) {
+                alert("El reproductor aún se está cargando. Aguarda unos segundos.");
+                return;
+            }
+
+            document.getElementById('assign-points-section').style.display = 'none';
+            document.getElementById('guess-input').value = '';
+            document.getElementById('feedback-msg').innerText = "🔊 Escuchando canción...";
+            document.getElementById('feedback-msg').style.color = "#1DB954";
+
+            const playlist = player.getPlaylist();
+            if (playlist && playlist.length > 0) {
+                const randomIndex = Math.floor(Math.random() * playlist.length);
+                player.playVideoAt(randomIndex);
+                startTimer();
             } else {
-                startTime = Date.now() - elapsedTime;
-                timerInterval = setInterval(updateTimer, 100);
-                document.getElementById('btn-timer').innerText = "⏸️ Pausar";
-                document.getElementById('btn-timer').style.backgroundColor = "#ff9800";
-                isRunning = true;
+                player.playVideo();
+                startTimer();
             }
         }
 
-        function resetTimer() {
+        function startTimer() {
             clearInterval(timerInterval);
-            isRunning = false;
             elapsedTime = 0;
-            document.getElementById('timer-display').innerText = "0.0s";
-            document.getElementById('btn-timer').innerText = "▶️ Empezar Tiempo";
-            document.getElementById('btn-timer').style.backgroundColor = "#1DB954";
+            startTime = Date.now();
+            isRunning = true;
+            timerInterval = setInterval(() => {
+                elapsedTime = Date.now() - startTime;
+                document.getElementById('timer-display').innerText = (elapsedTime / 1000).toFixed(1) + "s";
+            }, 100);
         }
 
-        function updateTimer() {
-            elapsedTime = Date.now() - startTime;
-            let seconds = (elapsedTime / 1000).toFixed(1);
-            document.getElementById('timer-display').innerText = seconds + "s";
+        function stopTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+        }
+
+        function onPlayerStateChange(event) {
+            if (event.data === YT.PlayerState.PLAYING) {
+                const videoData = player.getVideoData();
+                if (videoData && videoData.title) {
+                    currentSongTitle = videoData.title;
+                }
+            }
         }
 
         function calculatePoints(seconds) {
             if (seconds <= 2) return 5;
             if (seconds <= 5) return 3;
             if (seconds <= 10) return 1;
-            return 1; // Más de 10 segundos
+            return 1;
         }
 
-        function addPoints(player) {
-            let seconds = elapsedTime / 1000;
-            if (seconds === 0) {
-                alert("Primero inicia el cronómetro para calcular el tiempo.");
-                return;
+        function normalizeText(text) {
+            return text.toLowerCase()
+                       .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // quita tildes
+                       .replace(/[^a-z0-9]/g, ""); // quita símbolos/espacios
+        }
+
+        function checkAnswer() {
+            const userGuess = document.getElementById('guess-input').value.trim();
+            if (!userGuess) return;
+
+            if (!currentSongTitle) {
+                if (player && player.getVideoData) {
+                    currentSongTitle = player.getVideoData().title || "";
+                }
             }
 
-            let pts = calculatePoints(seconds);
+            const cleanGuess = normalizeText(userGuess);
+            const cleanTitle = normalizeText(currentSongTitle);
 
-            if (player === 1) {
-                score1 += pts;
+            // Verifica si el texto ingresado está contenido dentro del título del video
+            if (cleanTitle.includes(cleanGuess) && cleanGuess.length >= 3) {
+                stopTimer();
+                player.pauseVideo();
+
+                let seconds = elapsedTime / 1000;
+                pendingPoints = calculatePoints(seconds);
+
+                document.getElementById('feedback-msg').innerHTML = `🎉 ¡CORRECTO! (${seconds.toFixed(1)}s)<br><small>${currentSongTitle}</small>`;
+                document.getElementById('feedback-msg').style.color = "#ffca28";
+
+                document.getElementById('assign-points-section').style.display = 'block';
+            } else {
+                document.getElementById('feedback-msg').innerText = "❌ Incorrecto, ¡sigue intentando!";
+                document.getElementById('feedback-msg').style.color = "#d32f2f";
+            }
+        }
+
+        function awardPoints(playerNum) {
+            if (playerNum === 1) {
+                score1 += pendingPoints;
                 document.getElementById('score-p1').innerText = score1;
             } else {
-                score2 += pts;
+                score2 += pendingPoints;
                 document.getElementById('score-p2').innerText = score2;
             }
 
-            alert(`¡+${pts} punto(s) para ${player === 1 ? p1Name : p2Name}!`);
-            resetTimer();
+            document.getElementById('assign-points-section').style.display = 'none';
+            document.getElementById('feedback-msg').innerText = `+${pendingPoints} pts agregados a ${playerNum === 1 ? p1Name : p2Name}. Toca "Siguiente Canción"`;
         }
 
         function resetSetup() {
-            if (confirm("¿Querés cambiar la playlist o reiniciar el juego?")) {
+            if (confirm("¿Quieres cambiar la playlist o reiniciar los puntos?")) {
                 localStorage.clear();
                 location.reload();
             }
