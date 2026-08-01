@@ -55,6 +55,7 @@
         }
         button:active { transform: scale(0.98); }
         .btn-secondary { background-color: #333; color: #eee; }
+        .btn-pause { background-color: #ff9800; color: #000; }
         .btn-danger { background-color: #d32f2f; font-size: 0.85rem; padding: 10px; margin-top: 15px; }
         .scoreboard {
             display: flex;
@@ -66,7 +67,16 @@
         }
         .score-num { font-size: 2.5rem; color: #1DB954; font-weight: bold; }
         .timer { font-size: 3rem; margin: 5px 0; color: #ffca28; font-weight: bold; font-family: monospace; }
-        #player-container { display: none; } /* Reproductor oculto */
+        
+        #player-wrapper {
+            margin: 10px auto;
+            border-radius: 8px;
+            overflow: hidden;
+            width: 200px;
+            height: 120px;
+            background: #000;
+        }
+        
         .song-info {
             background: #222;
             padding: 12px;
@@ -80,6 +90,15 @@
             display: flex;
             gap: 10px;
             margin-top: 10px;
+        }
+        .badge-pts {
+            background: #282828;
+            color: #ffca28;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            display: inline-block;
         }
     </style>
 </head>
@@ -111,8 +130,15 @@
         </div>
 
         <div class="timer" id="timer-display">0.0s</div>
+        <div class="badge-pts" id="current-pts-badge">Valor: 5 Puntos</div>
 
-        <button onclick="playRandomSong()" style="background-color: #ff9800; font-size: 1.2rem;">▶️ Siguiente Canción Aleatoria</button>
+        <div id="player-wrapper">
+            <div id="yt-player"></div>
+        </div>
+
+        <!-- BOTONES DE CONTROL DE REPRODUCCIÓN Y PAUSA -->
+        <button id="btn-main-action" onclick="playRandomSong()" style="background-color: #1DB954; font-size: 1.1rem;">▶️ Siguiente Canción Aleatoria</button>
+        <button id="btn-pause-manual" class="btn-pause" onclick="pauseManually()" style="display:none;">⏸️ Pausar Canción y Tiempo</button>
 
         <div style="margin-top: 15px;">
             <input type="text" id="guess-input" placeholder="Escribe el nombre de la canción...">
@@ -132,11 +158,6 @@
         <button class="btn-danger" onclick="resetSetup()">⚙️ Cambiar Playlist o Nombres</button>
     </div>
 
-    <!-- Contenedor iframe de YouTube (Oculto) -->
-    <div id="player-container">
-        <div id="yt-player"></div>
-    </div>
-
     <script>
         let p1Name = "Jugador 1", p2Name = "Jugador 2";
         let score1 = 0, score2 = 0;
@@ -148,16 +169,18 @@
         let isRunning = false;
         let currentSongTitle = "";
         let pendingPoints = 0;
+        let isPlayerReady = false;
 
-        // Cargar API de YouTube
+        // Tramos de pausas automáticas (en segundos)
+        const checkPoints = [2.0, 5.0, 10.0];
+        let nextCheckIndex = 0;
+
         var tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
         var firstScriptTag = document.getElementsByTagName('script')[0];
         firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
-        function onYouTubeIframeAPIReady() {
-            // API Lista
-        }
+        function onYouTubeIframeAPIReady() {}
 
         window.onload = function() {
             const savedPlaylist = localStorage.getItem('yt_playlist_id');
@@ -211,52 +234,137 @@
             document.getElementById('setup-card').style.display = 'none';
             document.getElementById('game-card').style.display = 'block';
 
-            // Inicializar reproductor
             player = new YT.Player('yt-player', {
-                height: '200',
+                height: '120',
                 width: '200',
                 playerVars: {
                     'listType': 'playlist',
                     'list': playlistId,
                     'autoplay': 0,
-                    'controls': 0
+                    'controls': 1,
+                    'playsinline': 1
                 },
                 events: {
+                    'onReady': () => { isPlayerReady = true; },
                     'onStateChange': onPlayerStateChange
                 }
             });
         }
 
+        function updatePtsBadge(seconds) {
+            let pts = calculatePoints(seconds);
+            document.getElementById('current-pts-badge').innerText = `Valor actual: ${pts} Punto(s)`;
+        }
+
         function playRandomSong() {
-            if (!player || !player.getPlaylist) {
-                alert("El reproductor aún se está cargando. Aguarda unos segundos.");
+            if (!player || !isPlayerReady) {
+                alert("El reproductor aún está cargando. Aguarda un segundo.");
                 return;
             }
 
             document.getElementById('assign-points-section').style.display = 'none';
             document.getElementById('guess-input').value = '';
-            document.getElementById('feedback-msg').innerText = "🔊 Escuchando canción...";
+            document.getElementById('feedback-msg').innerText = "🔊 Reproduciendo canción...";
             document.getElementById('feedback-msg').style.color = "#1DB954";
 
-            const playlist = player.getPlaylist();
-            if (playlist && playlist.length > 0) {
-                const randomIndex = Math.floor(Math.random() * playlist.length);
-                player.playVideoAt(randomIndex);
-                startTimer();
-            } else {
-                player.playVideo();
-                startTimer();
+            nextCheckIndex = 0;
+            updatePtsBadge(0);
+
+            try {
+                const playlist = player.getPlaylist();
+                if (playlist && playlist.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * playlist.length);
+                    player.playVideoAt(randomIndex);
+                } else {
+                    player.playVideo();
+                }
+                
+                resetAndStartTimer();
+                showPauseButton(true);
+            } catch (e) {
+                console.error(e);
             }
         }
 
-        function startTimer() {
+        function resumeSong() {
+            if (player && player.playVideo) {
+                player.playVideo();
+                startTimerFromCurrent();
+                showPauseButton(true);
+                document.getElementById('feedback-msg').innerText = "🔊 Continuación de canción...";
+                document.getElementById('feedback-msg').style.color = "#1DB954";
+            }
+        }
+
+        function pauseManually() {
+            pausePlayback();
+            document.getElementById('feedback-msg').innerText = "⏸️ Pausado manualmente. ¡Ingresa tu respuesta!";
+            document.getElementById('feedback-msg').style.color = "#ffca28";
+            
+            // Configura el botón principal para poder continuar si nadie adivina
+            const btnMain = document.getElementById('btn-main-action');
+            btnMain.innerText = "▶️ Continuar Canción";
+            btnMain.onclick = resumeSong;
+            btnMain.style.backgroundColor = "#ff9800";
+        }
+
+        function pausePlayback() {
+            if (player && player.pauseVideo) player.pauseVideo();
+            stopTimer();
+            showPauseButton(false);
+        }
+
+        function showPauseButton(visible) {
+            const btnPause = document.getElementById('btn-pause-manual');
+            const btnMain = document.getElementById('btn-main-action');
+            if (visible) {
+                btnPause.style.display = 'block';
+                btnMain.style.display = 'none';
+            } else {
+                btnPause.style.display = 'none';
+                btnMain.style.display = 'block';
+            }
+        }
+
+        function resetAndStartTimer() {
             clearInterval(timerInterval);
             elapsedTime = 0;
             startTime = Date.now();
             isRunning = true;
+            runTimerLoop();
+        }
+
+        function startTimerFromCurrent() {
+            clearInterval(timerInterval);
+            startTime = Date.now() - elapsedTime;
+            isRunning = true;
+            runTimerLoop();
+        }
+
+        function runTimerLoop() {
             timerInterval = setInterval(() => {
                 elapsedTime = Date.now() - startTime;
-                document.getElementById('timer-display').innerText = (elapsedTime / 1000).toFixed(1) + "s";
+                let seconds = elapsedTime / 1000;
+                document.getElementById('timer-display').innerText = seconds.toFixed(1) + "s";
+                updatePtsBadge(seconds);
+
+                // Comprobar freno automático por tramos
+                if (nextCheckIndex < checkPoints.length) {
+                    let targetPoint = checkPoints[nextCheckIndex];
+                    if (seconds >= targetPoint) {
+                        pausePlayback();
+                        nextCheckIndex++;
+                        
+                        document.getElementById('feedback-msg').innerHTML = `⏸️ <b>Pausa a los ${targetPoint}s</b><br>¿Alguien sabe la canción?`;
+                        document.getElementById('feedback-msg').style.color = "#ffca28";
+
+                        // Cambiar botón principal a 'Continuar'
+                        const btnMain = document.getElementById('btn-main-action');
+                        btnMain.innerText = "▶️ Continuar (Siguiente tramo)";
+                        btnMain.onclick = resumeSong;
+                        btnMain.style.backgroundColor = "#ff9800";
+                    }
+                }
             }, 100);
         }
 
@@ -275,43 +383,45 @@
         }
 
         function calculatePoints(seconds) {
-            if (seconds <= 2) return 5;
-            if (seconds <= 5) return 3;
-            if (seconds <= 10) return 1;
+            if (seconds <= 2.1) return 5;
+            if (seconds <= 5.1) return 3;
+            if (seconds <= 10.1) return 1;
             return 1;
         }
 
         function normalizeText(text) {
             return text.toLowerCase()
-                       .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // quita tildes
-                       .replace(/[^a-z0-9]/g, ""); // quita símbolos/espacios
+                       .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                       .replace(/[^a-z0-9]/g, "");
         }
 
         function checkAnswer() {
             const userGuess = document.getElementById('guess-input').value.trim();
             if (!userGuess) return;
 
-            if (!currentSongTitle) {
-                if (player && player.getVideoData) {
-                    currentSongTitle = player.getVideoData().title || "";
-                }
+            if (!currentSongTitle && player && player.getVideoData) {
+                currentSongTitle = player.getVideoData().title || "";
             }
 
             const cleanGuess = normalizeText(userGuess);
             const cleanTitle = normalizeText(currentSongTitle);
 
-            // Verifica si el texto ingresado está contenido dentro del título del video
             if (cleanTitle.includes(cleanGuess) && cleanGuess.length >= 3) {
-                stopTimer();
-                player.pauseVideo();
+                pausePlayback();
 
                 let seconds = elapsedTime / 1000;
                 pendingPoints = calculatePoints(seconds);
 
                 document.getElementById('feedback-msg').innerHTML = `🎉 ¡CORRECTO! (${seconds.toFixed(1)}s)<br><small>${currentSongTitle}</small>`;
-                document.getElementById('feedback-msg').style.color = "#ffca28";
+                document.getElementById('feedback-msg').style.color = "#1DB954";
 
                 document.getElementById('assign-points-section').style.display = 'block';
+
+                // Restablecer botón para la siguiente ronda
+                const btnMain = document.getElementById('btn-main-action');
+                btnMain.innerText = "▶️ Siguiente Canción Aleatoria";
+                btnMain.onclick = playRandomSong;
+                btnMain.style.backgroundColor = "#1DB954";
             } else {
                 document.getElementById('feedback-msg').innerText = "❌ Incorrecto, ¡sigue intentando!";
                 document.getElementById('feedback-msg').style.color = "#d32f2f";
