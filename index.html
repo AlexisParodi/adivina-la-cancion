@@ -131,6 +131,8 @@
         <div class="timer" id="timer-display">0.0s</div>
         <div class="badge-pts" id="current-pts-badge">Valor: 5 Puntos</div>
 
+        <button id="btn-init-player" class="btn-spotify" onclick="manualInitPlayer()" style="display:none; background-color: #ffca28; color: #000; margin-bottom: 10px;">⚡ Activar Reproductor Web</button>
+
         <button id="btn-main-action" onclick="playRandomSong()" style="background-color: #1DB954; font-size: 1.1rem;">▶️ Siguiente Canción Aleatoria</button>
         <button id="btn-pause-manual" class="btn-pause" onclick="pauseManually()" style="display:none;">⏸️ Pausar Canción y Tiempo</button>
 
@@ -139,7 +141,7 @@
             <button class="btn-secondary" onclick="checkAnswer()">🔍 Comprobar Respuesta</button>
         </div>
 
-        <div class="song-info" id="feedback-msg">Conectando reproductor...</div>
+        <div class="song-info" id="feedback-msg">Cargando reproductor...</div>
 
         <div id="assign-points-section" style="display:none; margin-top: 15px;">
             <p style="margin: 5px 0; font-size: 0.9rem;">¿Quién la adivinó?</p>
@@ -249,6 +251,7 @@
                 'user-read-email',
                 'user-read-private',
                 'user-modify-playback-state',
+                'user-read-playback-state',
                 'playlist-read-private',
                 'playlist-read-collaborative'
             ];
@@ -277,6 +280,10 @@
         function initSpotifyPlayer() {
             if (!accessToken) return;
 
+            if (spotifyPlayer) {
+                spotifyPlayer.disconnect();
+            }
+
             spotifyPlayer = new Spotify.Player({
                 name: 'Adivina la Canción Web',
                 getOAuthToken: cb => { cb(accessToken); },
@@ -285,6 +292,7 @@
 
             spotifyPlayer.addListener('ready', ({ device_id }) => {
                 deviceId = device_id;
+                document.getElementById('btn-init-player').style.display = 'none';
                 const feedback = document.getElementById('feedback-msg');
                 if (feedback) {
                     feedback.innerText = "🟢 Reproductor listo. Presiona 'Siguiente Canción'.";
@@ -297,18 +305,23 @@
             });
 
             spotifyPlayer.addListener('initialization_error', ({ message }) => {
-                alert("Error al inicializar el reproductor: " + message);
+                console.error("Init Error:", message);
             });
 
             spotifyPlayer.addListener('authentication_error', ({ message }) => {
-                alert("Error de autenticación. Por favor presiona 'Reconectar Spotify'.");
+                alert("Sesión expirada. Presiona 'Reconectar Spotify'.");
             });
 
             spotifyPlayer.addListener('account_error', ({ message }) => {
-                alert("⚠️ ATENCIÓN: El reproductor Web requiere una cuenta de Spotify PREMIUM activa.");
+                alert("⚠️ Se requiere una cuenta de Spotify PREMIUM activa para reproducir audio web.");
             });
 
             spotifyPlayer.connect();
+        }
+
+        function manualInitPlayer() {
+            initSpotifyPlayer();
+            document.getElementById('feedback-msg').innerText = "⏳ Conectando reproductor...";
         }
 
         function extractPlaylistId(urlOrId) {
@@ -373,15 +386,37 @@
             document.getElementById('setup-card').style.display = 'none';
             document.getElementById('game-card').style.display = 'block';
 
-            if (!deviceId && spotifyPlayer) {
-                spotifyPlayer.connect();
+            // Intentar inicializar el reproductor con el clic del usuario
+            if (!deviceId) {
+                initSpotifyPlayer();
+                setTimeout(() => {
+                    if (!deviceId) {
+                        document.getElementById('btn-init-player').style.display = 'block';
+                        document.getElementById('feedback-msg').innerText = "Presiona '⚡ Activar Reproductor Web' para conectar Spotify.";
+                        document.getElementById('feedback-msg').style.color = "#ffca28";
+                    }
+                }, 2000);
             }
         }
 
         async function playRandomSong() {
             if (!deviceId) {
-                alert("El reproductor aún se está conectando. Si tarda demasiado, asegúrate de tener Spotify Premium y no estar usando un bloqueador de anuncios.");
-                return;
+                // Si el SDK web no conectó, intentamos obtener los dispositivos activos de Spotify
+                try {
+                    const devRes = await fetch('https://api.spotify.com/v1/me/player/devices', {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    const devData = await devRes.json();
+                    if (devData.devices && devData.devices.length > 0) {
+                        deviceId = devData.devices[0].id;
+                    }
+                } catch(e) {}
+
+                if (!deviceId) {
+                    document.getElementById('btn-init-player').style.display = 'block';
+                    alert("Presiona el botón amarillo '⚡ Activar Reproductor Web' arriba o abre Spotify en tu PC/Celular para continuar.");
+                    return;
+                }
             }
 
             document.getElementById('assign-points-section').style.display = 'none';
@@ -411,11 +446,16 @@
         async function resumeSong() {
             if (spotifyPlayer) {
                 await spotifyPlayer.resume();
-                startTimerFromCurrent();
-                showPauseButton(true);
-                document.getElementById('feedback-msg').innerText = "🔊 Reanudando canción...";
-                document.getElementById('feedback-msg').style.color = "#1DB954";
+            } else {
+                await fetch('https://api.spotify.com/v1/me/player/play', {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
             }
+            startTimerFromCurrent();
+            showPauseButton(true);
+            document.getElementById('feedback-msg').innerText = "🔊 Reanudando canción...";
+            document.getElementById('feedback-msg').style.color = "#1DB954";
         }
 
         async function pauseManually() {
@@ -430,7 +470,14 @@
         }
 
         async function pausePlayback() {
-            if (spotifyPlayer) await spotifyPlayer.pause();
+            if (spotifyPlayer) {
+                await spotifyPlayer.pause();
+            } else {
+                await fetch('https://api.spotify.com/v1/me/player/pause', {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+            }
             stopTimer();
             showPauseButton(false);
         }
