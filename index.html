@@ -156,7 +156,8 @@
     <script src="https://sdk.scdn.co/spotify-player.js"></script>
     <script>
         const CLIENT_ID = '03c5fd3099224cb9bfeea3acf10d5a55'; 
-const REDIRECT_URI = 'https://alexisparodi.github.io/adivina-la-cancion/';
+        const REDIRECT_URI = 'https://alexisparodi.github.io/adivina-la-cancion/';
+
         let accessToken = null;
         let spotifyPlayer = null;
         let deviceId = null;
@@ -174,7 +175,6 @@ const REDIRECT_URI = 'https://alexisparodi.github.io/adivina-la-cancion/';
         const checkPoints = [2.0, 5.0, 10.0];
         let nextCheckIndex = 0;
 
-        // --- Helpers PKCE (Exigidos por Spotify) ---
         function generateRandomString(length) {
             let text = '';
             let possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -195,7 +195,6 @@ const REDIRECT_URI = 'https://alexisparodi.github.io/adivina-la-cancion/';
             return base64encode(digest);
         }
 
-        // --- Manejo de Autenticación y Carga ---
         window.onload = async function() {
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
@@ -271,7 +270,6 @@ const REDIRECT_URI = 'https://alexisparodi.github.io/adivina-la-cancion/';
             location.reload();
         }
 
-        // Inicializar SDK de Spotify
         window.onSpotifyWebPlaybackSDKReady = () => {
             if (!accessToken) return;
             spotifyPlayer = new Spotify.Player({
@@ -310,20 +308,26 @@ const REDIRECT_URI = 'https://alexisparodi.github.io/adivina-la-cancion/';
             localStorage.setItem('game_p2', p2Name);
 
             try {
-                const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+                // Nuevo endpoint corregido de la API de Spotify
+                const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}`, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
                 const data = await res.json();
-                playlistTracks = data.items.map(item => item.track).filter(track => track && track.uri);
                 
-                if (playlistTracks.length === 0) {
-                    alert("No se pudieron cargar las canciones de la playlist. Asegúrate de que sea pública.");
+                if (data.tracks && data.tracks.items) {
+                    playlistTracks = data.tracks.items
+                        .map(item => item.track)
+                        .filter(track => track && track.uri);
+                }
+
+                if (!playlistTracks || playlistTracks.length === 0) {
+                    alert("No se pudieron cargar canciones. Verifica que la playlist sea pública o vuelve a iniciar sesión.");
                     return;
                 }
 
                 startGame();
             } catch (e) {
-                alert("Error al conectar con la playlist. Revisa los permisos o vuelve a iniciar sesión.");
+                alert("Error al conectar con la playlist. Cierra sesión y vuelve a entrar.");
             }
         }
 
