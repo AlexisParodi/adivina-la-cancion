@@ -308,26 +308,33 @@
             localStorage.setItem('game_p2', p2Name);
 
             try {
-                // Nuevo endpoint corregido de la API de Spotify
-                const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}`, {
+                // Endpoint compatible para obtener canciones directas de la playlist
+                const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/items?limit=50`, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
+
+                if (res.status === 401) {
+                    alert("La sesión expiró. Por favor, toca 'Cerrar Sesión' e ingresa de nuevo.");
+                    return;
+                }
+
                 const data = await res.json();
                 
-                if (data.tracks && data.tracks.items) {
-                    playlistTracks = data.tracks.items
-                        .map(item => item.track)
-                        .filter(track => track && track.uri);
+                if (data.items) {
+                    playlistTracks = data.items
+                        .map(item => item.item || item.track)
+                        .filter(track => track && track.uri && track.type === 'track');
                 }
 
                 if (!playlistTracks || playlistTracks.length === 0) {
-                    alert("No se pudieron cargar canciones. Verifica que la playlist sea pública o vuelve a iniciar sesión.");
+                    alert("No se pudieron cargar canciones. Verifica que la playlist sea pública.");
                     return;
                 }
 
                 startGame();
             } catch (e) {
-                alert("Error al conectar con la playlist. Cierra sesión y vuelve a entrar.");
+                console.error(e);
+                alert("Error al conectar con la playlist. Intenta iniciar sesión de nuevo.");
             }
         }
 
