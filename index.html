@@ -164,7 +164,6 @@
     <script src="https://sdk.scdn.co/spotify-player.js"></script>
     <script>
         const CLIENT_ID = '03c5fd3099224cb9bfeea3acf10d5a55'; 
-        // URI idéntico al Dashboard
         const REDIRECT_URI = 'https://alexisparodi.github.io/adivina-la-cancion/';
 
         let accessToken = null;
@@ -351,8 +350,8 @@
             btnSave.disabled = true;
 
             try {
-                // Intentar traer las canciones mediante el endpoint oficial de items
-                const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`, {
+                // Consulta directa al endpoint general de la playlist
+                const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}`, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
 
@@ -360,8 +359,8 @@
                     const errData = await res.json();
                     errorDiv.innerText = `Error Spotify (${res.status}): ${errData.error?.message || 'No se pudo acceder'}`;
                     
-                    if (res.status === 401) {
-                        setTimeout(() => logoutSpotify(), 2000);
+                    if (res.status === 401 || res.status === 403) {
+                        errorDiv.innerText += " - Haz clic en '🔄 Reconectar / Resetear Token' abajo para actualizar tus permisos.";
                     }
                     btnSave.innerText = "Guardar e Iniciar Juego";
                     btnSave.disabled = false;
@@ -370,8 +369,8 @@
 
                 const data = await res.json();
                 
-                if (data.items) {
-                    playlistTracks = data.items
+                if (data.tracks && data.tracks.items) {
+                    playlistTracks = data.tracks.items
                         .map(item => item.track)
                         .filter(track => track && track.uri && track.name);
                 }
