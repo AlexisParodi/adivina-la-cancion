@@ -327,11 +327,15 @@
             document.getElementById('feedback-msg').style.color = "#ffca28";
         }
 
+        // Extractor de ID ultra robusto
         function extractPlaylistId(urlOrId) {
             let clean = urlOrId.trim();
+            // Si viene la URL completa tipo https://open.spotify.com/playlist/0Jqll3k2Yj2T80OH09?si=...
             if (clean.includes("playlist/")) {
-                clean = clean.split("playlist/")[1].split("?")[0].split("&")[0];
+                clean = clean.split("playlist/")[1];
             }
+            // Eliminar parámetros como ?si=... o &nd=...
+            clean = clean.split("?")[0].split("&")[0].split("/")[0];
             return clean;
         }
 
@@ -346,7 +350,7 @@
             }
 
             const playlistId = extractPlaylistId(inputVal);
-            localStorage.setItem('spotify_playlist_id', playlistId);
+            localStorage.setItem('spotify_playlist_id', inputVal);
             localStorage.setItem('game_p1', p1Name);
             localStorage.setItem('game_p2', p2Name);
 
@@ -356,7 +360,13 @@
                 });
 
                 if (res.status === 401) {
-                    alert("Tu sesión de Spotify venció. Presiona 'Reconectar Spotify' para continuar.");
+                    alert("Tu sesión de Spotify venció. Haz clic en 'Reconectar Spotify'.");
+                    logoutSpotify();
+                    return;
+                }
+
+                if (!res.ok) {
+                    alert("No se encontró la playlist. Asegúrate de que sea pública y el link esté correcto.");
                     return;
                 }
 
@@ -365,18 +375,18 @@
                 if (data.items) {
                     playlistTracks = data.items
                         .map(item => item.track)
-                        .filter(track => track && track.uri && track.is_playable !== false);
+                        .filter(track => track && track.uri && track.name);
                 }
 
                 if (!playlistTracks || playlistTracks.length === 0) {
-                    alert("No se pudieron cargar canciones. Verifica que la playlist sea pública.");
+                    alert("Esta playlist no tiene canciones disponibles o es privada.");
                     return;
                 }
 
                 startGame();
             } catch (e) {
                 console.error(e);
-                alert("Error de conexión. Presiona 'Reconectar Spotify'.");
+                alert("Error al conectar con la API de Spotify.");
             }
         }
 
@@ -389,10 +399,9 @@
             document.getElementById('setup-card').style.display = 'none';
             document.getElementById('game-card').style.display = 'block';
 
-            // Conectar el reproductor silenciosamente en segundo plano sin interrumpir al usuario
             if (!deviceId) {
                 initSpotifyPlayer();
-                document.getElementById('feedback-msg').innerText = "Conectando con el reproductor de Spotify... Aguarda unos segundos.";
+                document.getElementById('feedback-msg').innerText = "Conectando con el reproductor de Spotify...";
                 document.getElementById('feedback-msg').style.color = "#ffca28";
                 
                 setTimeout(() => {
